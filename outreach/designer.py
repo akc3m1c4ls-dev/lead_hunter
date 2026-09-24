@@ -31,7 +31,7 @@ TEXT = {
     "et": {
         "greeting": "Tere,",
         "proposal": "Meie ettepanek",
-        "other": "Mida veel saame teha",
+        "other": "Mida veel saame pakkuda:",
         "view": "Vaata →",
         "visit": "Külasta AutomateLabs →",
         "reply": "Vasta",
@@ -479,7 +479,7 @@ def render_product_cards(
             f"""
             <td width="25%"
                 valign="top"
-                style="padding:5px;">
+                style="width: 25%; padding:5px;">
 
               <table
                   role="presentation"
@@ -487,7 +487,7 @@ def render_product_cards(
                   cellspacing="0"
                   cellpadding="0"
                   border="0"
-                  style="
+                  style="width: 100%; table-layout: fixed; 
                     border:1px solid #23766f;
                     border-radius:16px;
                     background:#073b38;
