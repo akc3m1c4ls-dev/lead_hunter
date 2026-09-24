@@ -480,58 +480,65 @@ def render_product_cards(
     products = PRODUCTS[language]
     labels = TEXT[language]
 
-    cells = []
+    rows = []
 
     for title, url, icon in products:
 
-        cells.append(
+        rows.append(
             f"""
-            <td width="25%"
-                valign="top"
-                style="width: 25%; padding:5px;">
+            <tr>
+              <td style="padding:5px 0;">
 
-              <table
-                  role="presentation"
-                  width="100%"
-                  cellspacing="0"
-                  cellpadding="0"
-                  border="0"
-                  style="width: 100%; table-layout: fixed; 
-                    border:1px solid #23766f;
-                    border-radius:16px;
-                    background:#073b38;
-                  ">
-
-                <tr>
-                  <td
-                      align="center"
-                      style="
-                        padding:18px 8px 16px 8px;
-                      ">
-
-                    <div style="
-                        font-family:Arial,Helvetica,sans-serif;
-                        font-size:25px;
-                        color:#a9eadc;
-                        margin-bottom:10px;
+                <table
+                    role="presentation"
+                    width="100%"
+                    cellspacing="0"
+                    cellpadding="0"
+                    border="0"
+                    style="
+                      width:100%;
+                      background:#073b38;
+                      border:1px solid #23766f;
+                      border-radius:16px;
                     ">
+
+                  <tr>
+
+                    <!-- ICON -->
+                    <td
+                        width="58"
+                        align="center"
+                        style="
+                          width:58px;
+                          padding:18px 8px 18px 16px;
+                          font-family:Arial,Helvetica,sans-serif;
+                          font-size:25px;
+                          color:#a9eadc;
+                        ">
                       {safe(icon)}
-                    </div>
+                    </td>
 
-                    <div style="
-                        min-height:44px;
-                        font-family:Arial,Helvetica,sans-serif;
-                        font-size:14px;
-                        line-height:1.3;
-                        font-weight:700;
-                        color:#ffffff;
-                    ">
+                    <!-- PRODUCT NAME -->
+                    <td
+                        style="
+                          padding:18px 10px;
+                          font-family:Arial,Helvetica,sans-serif;
+                          font-size:16px;
+                          line-height:1.3;
+                          font-weight:700;
+                          color:#ffffff;
+                        ">
                       {safe(title)}
-                    </div>
+                    </td>
 
-                    <div style="
-                        margin-top:12px;
-                    ">
+                    <!-- LINK -->
+                    <td
+                        width="85"
+                        align="right"
+                        style="
+                          width:85px;
+                          padding:18px 18px 18px 8px;
+                        ">
 
                       <a
                           href="{safe(url)}"
@@ -540,24 +547,24 @@ def render_product_cards(
                             font-family:Arial,Helvetica,sans-serif;
                             font-size:14px;
                             font-weight:700;
-                            text-decoration:underline;
+                            text-decoration:none;
+                            white-space:nowrap;
                           ">
                         {safe(labels["view"])}
                       </a>
 
-                    </div>
+                    </td>
 
-                  </td>
-                </tr>
+                  </tr>
 
-              </table>
+                </table>
 
-            </td>
+              </td>
+            </tr>
             """
         )
 
-    return "".join(cells)
-
+    return "".join(rows)
 
 # ============================================================
 # HTML EMAIL RENDERER
