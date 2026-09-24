@@ -1,12 +1,21 @@
-from __future__ import annotations
-
 import json
 import os
+from pathlib import Path
 from html import escape
 from typing import Iterable
 
+from dotenv import load_dotenv
 from google import genai
 
+
+# lead_hunter/outreach/designer.py
+# parent       = outreach/
+# parent.parent = lead_hunter/
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ENV_FILE = PROJECT_ROOT / ".env"
+
+load_dotenv(ENV_FILE)
 
 # ============================================================
 # CONFIG
