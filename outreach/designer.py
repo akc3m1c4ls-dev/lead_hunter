@@ -14,7 +14,7 @@ from google import genai
 
 SITE_URL = "https://automatelabs.me"
 
-GEMINI_MODEL = os.getenv(
+MODEL = os.getenv(
     "MODEL",
 )
 
@@ -309,7 +309,7 @@ No text before or after the JSON.
 """
 
     response = client.models.generate_content(
-        model=GEMINI_MODEL,
+        model=MODEL,
         contents=prompt,
         config={
             "response_mime_type": "application/json",
