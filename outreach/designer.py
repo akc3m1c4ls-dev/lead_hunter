@@ -525,7 +525,8 @@ def render_product_cards(
                           font-family:Arial,Helvetica,sans-serif;
                           font-size:16px;
                           line-height:1.3;
-                          font-weight:700;
+                          font-weight:700; 
+                          text-align :left;
                           color:#ffffff;
                         ">
                       {safe(title)}
