@@ -178,13 +178,6 @@ def design_draft_with_ai(
     Gemini DOES NOT create HTML.
     """
 
-    api_key = os.getenv("GEMINI_API_KEY")
-
-    if not api_key:
-        raise RuntimeError(
-            "GEMINI_API_KEY is not set."
-        )
-
     client = genai.Client(api_key=api_key)
 
     preferred_language = normalize_language(preferred_language)
