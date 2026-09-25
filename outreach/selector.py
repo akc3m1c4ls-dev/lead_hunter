@@ -1,7 +1,7 @@
-from outreach.db import get_connection
+from db import get_connection
 
 
-def get_next_lead():
+def get_next_lead(exclude_ids=None):
     """
     Return exactly ONE eligible opportunity.
 
@@ -14,10 +14,19 @@ def get_next_lead():
     Suppressed email addresses are skipped.
     """
 
+    exclude_ids = {int(x) for x in (exclude_ids or [])}
+
+    exclude_sql = ""
+    params = []
+    if exclude_ids:
+        placeholders = ",".join("?" for _ in exclude_ids)
+        exclude_sql = f" AND o.id NOT IN ({placeholders})"
+        params = sorted(exclude_ids)
+
     with get_connection() as conn:
 
         row = conn.execute(
-            """
+            f"""
             SELECT
                 o.id,
                 o.business_name,
@@ -47,6 +56,7 @@ def get_next_lead():
             WHERE o.status = 'done'
 
               AND o.email IS NOT NULL
+              {exclude_sql}
               AND TRIM(o.email) != ''
 
               -- Never contact suppressed addresses
@@ -71,7 +81,8 @@ def get_next_lead():
                 o.id ASC
 
             LIMIT 1
-            """
+            """,
+            params,
         ).fetchone()
 
     if row is None:

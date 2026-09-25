@@ -1,16 +1,29 @@
 from google import genai
-from google.genai.errors import ServerError
 
 import json
-import time
 
-from config import GEMINI, MODEL
+from pathlib import Path
+
+import os 
+
+from dotenv import load_dotenv
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ENV_FILE = PROJECT_ROOT / ".env"
+
+load_dotenv(ENV_FILE)
+
+GEMINI = os.getenv("GEMINI")
+MODEL = os.getenv("MODEL")
+
 
 
 client = genai.Client(api_key=GEMINI)
 
-MAX_RETRIES = 3
-RETRY_DELAYS = [10, 30, 60]
+try:
+    from .gemini_retry import call_gemini_with_retry
+except ImportError:
+    from gemini_retry import call_gemini_with_retry
 
 
 def review_draft(
@@ -113,6 +126,13 @@ REVIEW RULES
 
 Carefully compare the generated email against the original research.
 
+The intended sales structure is product-first: when supported by the research,
+the email should foreground relevant AutomateLabs products such as Website
+Upgrade, AI Chatbot, Online Booking, or Routine Task Automation. A bespoke
+company-specific automation idea is secondary. Do not reject a draft merely
+because it mentions more than one relevant standard product, provided each is
+supported as an opportunity and no absence is invented.
+
 
 1. FACTUAL ACCURACY
 
@@ -159,6 +179,13 @@ back to:
 - signals
 
 Do not assume information that is absent from the research.
+
+Reject an intro that merely summarizes the company instead of identifying a
+product-relevant weakness when such a weakness exists in the research. Reject
+unsupported causal leaps from neutral facts. For example, customer count or
+number of languages does NOT prove repetitive queries, manual work, wasted time,
+or lost customers. Prefer supported website weaknesses such as an outdated site,
+weak mobile experience, no visible booking, or no visible chatbot.
 
 
 3. UNCERTAINTY
@@ -366,62 +393,33 @@ Do NOT introduce new business information.
 Return structured JSON data only.
 """
 
-    response = None
-
-    for attempt in range(MAX_RETRIES):
-        try:
-            response = client.models.generate_content(
-                model=MODEL,
-                contents=prompt,
-                config={
-                    "response_mime_type": "application/json",
-                    "response_schema": {
-                        "type": "OBJECT",
-                        "properties": {
-                            "approved": {
-                                "type": "BOOLEAN",
-                            },
-                            "issues": {
-                                "type": "ARRAY",
-                                "items": {
-                                    "type": "STRING",
-                                },
-                            },
-                            "revision_instructions": {
-                                "type": "STRING",
-                            },
-                            "reasoning": {
-                                "type": "STRING",
-                            },
-                        },
-                        "required": [
-                            "approved",
-                            "issues",
-                            "revision_instructions",
-                            "reasoning",
-                        ],
+    response = call_gemini_with_retry(
+        lambda: client.models.generate_content(
+            model=MODEL,
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_schema": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "approved": {"type": "BOOLEAN"},
+                        "issues": {"type": "ARRAY", "items": {"type": "STRING"}},
+                        "revision_instructions": {"type": "STRING"},
+                        "reasoning": {"type": "STRING"},
                     },
+                    "required": [
+                        "approved",
+                        "issues",
+                        "revision_instructions",
+                        "reasoning",
+                    ],
                 },
-            )
+            },
+        ),
+        label="Drafter",
+    )
 
-            break
-
-        except ServerError as e:
-            print(
-                f"Drafter Gemini error "
-                f"(attempt {attempt + 1}/{MAX_RETRIES}): {e}"
-            )
-
-            if attempt == MAX_RETRIES - 1:
-                print("Drafter failed after retries.")
-                return None
-
-            delay = RETRY_DELAYS[attempt]
-
-            print(f"Waiting {delay}s before retry...")
-            time.sleep(delay)
-
-    if response is None:
+    if response is None or not response.text:
         return None
 
     data = json.loads(response.text)

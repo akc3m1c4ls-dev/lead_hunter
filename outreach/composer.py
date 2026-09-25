@@ -1,68 +1,55 @@
 from google import genai
-from google.genai.errors import ServerError
+from pathlib import Path
 
 import json
-import time
 
-from config import GEMINI, MODEL
+import os 
+
+from dotenv import load_dotenv
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ENV_FILE = PROJECT_ROOT / ".env"
+
+load_dotenv(ENV_FILE)
+
+GEMINI = os.getenv("GEMINI")
+MODEL = os.getenv("MODEL")
 
 
 client = genai.Client(api_key=GEMINI)
 
-MAX_RETRIES = 3
-RETRY_DELAYS = [10, 30, 60]
+try:
+    from .gemini_retry import call_gemini_with_retry
+except ImportError:
+    from gemini_retry import call_gemini_with_retry
 
 
 def _generate_email(prompt: str) -> dict | None:
-    response = None
-
-    for attempt in range(MAX_RETRIES):
-        try:
-            response = client.models.generate_content(
-                model=MODEL,
-                contents=prompt,
-                config={
-                    "response_mime_type": "application/json",
-                    "response_schema": {
-                        "type": "OBJECT",
-                        "properties": {
-                            "subject": {"type": "STRING"},
-                            "estonian": {"type": "STRING"},
-                            "russian": {"type": "STRING"},
-                            "english": {"type": "STRING"},
-                        },
-                        "required": [
-                            "subject",
-                            "estonian",
-                            "russian",
-                            "english",
-                        ],
+    response = call_gemini_with_retry(
+        lambda: client.models.generate_content(
+            model=MODEL,
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_schema": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "subject": {"type": "STRING"},
+                        "estonian": {"type": "STRING"},
+                        "russian": {"type": "STRING"},
+                        "english": {"type": "STRING"},
                     },
+                    "required": ["subject", "estonian", "russian", "english"],
                 },
-            )
+            },
+        ),
+        label="Composer",
+    )
 
-            break
-
-        except ServerError as e:
-            print(
-                f"Gemini error "
-                f"(attempt {attempt + 1}/{MAX_RETRIES}): {e}"
-            )
-
-            if attempt == MAX_RETRIES - 1:
-                print("Gemini failed after retries.")
-                return None
-
-            delay = RETRY_DELAYS[attempt]
-
-            print(f"Waiting {delay}s before retry...")
-            time.sleep(delay)
-
-    if response is None:
+    if response is None or not response.text:
         return None
 
     data = json.loads(response.text)
-
     return {
         "subject": data["subject"].strip(),
         "estonian": data["estonian"].strip(),
@@ -136,10 +123,13 @@ Confidence:
 
 EMAIL OBJECTIVE
 
-Start a genuine conversation about ONE specific automation opportunity
-that appears relevant to this business.
+Start a genuine conversation around the most relevant concrete AutomateLabs
+product opportunities visible in the research. Prioritise practical gaps such
+as Website Upgrade, AI Chatbot, Online Booking, or Routine Task Automation
+when the supplied evidence supports them.
 
-Do not try to sell every AutomateLabs service.
+A more bespoke company-specific automation opportunity may be mentioned as
+a secondary idea. Do not try to sell every service.
 
 
 WRITING RULES
@@ -158,9 +148,13 @@ by the supplied information.
 
 2. FOCUS
 
-Choose ONE strong automation opportunity.
+Prioritise 1-3 relevant AutomateLabs products supported by the research:
+Website Upgrade, AI Chatbot, Online Booking, or Routine Task Automation.
 
-Do not list multiple unrelated services.
+If the research contains a more bespoke automation idea, keep it secondary.
+Do not claim a website is old, or that chatbot/booking is absent, unless the
+supplied research supports that observation. If evidence is uncertain, phrase
+it as an opportunity rather than a confirmed deficiency.
 
 
 3. TONE
@@ -187,11 +181,20 @@ Use whitespace between paragraphs so the email is visually easy to scan.
 A good structure is:
 
 Paragraph 1:
-A short personalised observation about the business.
+Open with a concrete weakness or missing capability visible in the research.
+Prefer customer-facing website findings: an old/outdated website, weak mobile
+experience, no visible online booking, no visible chatbot, or another clearly
+documented friction. Say it politely and plainly: "We noticed that your website
+looks dated..." or, when absence is uncertain, "We couldn't find an online
+booking option...". Do NOT open by summarising what the company does, its size,
+customer count, languages, growth, or other background facts. Those facts are
+not problems by themselves.
 
 Paragraph 2:
-One clear problem or opportunity and a simple explanation of what
-AutomateLabs could help automate.
+State only a consequence that directly follows from the observed weakness. Never
+invent manual work, repetitive queries, lost customers, wasted time, or another
+problem merely because it sounds plausible. Keep the standard product as the
+obvious fix and bespoke automation secondary.
 
 Paragraph 3:
 A short practical benefit and low-pressure invitation to talk.
@@ -217,10 +220,18 @@ Do not begin with a long introduction about AutomateLabs.
 
 Briefly explain:
 
-- what caught our attention
-- what could potentially be improved
-- what AutomateLabs could build or automate
+- the concrete problem or missing capability we observed
+- the practical consequence
+- which standard AutomateLabs product directly fixes it
 - the practical benefit
+
+The opening should follow: OBSERVED WEAKNESS -> DIRECT CONSEQUENCE.
+The product proposal below the intro provides the FIX.
+
+IMPORTANT: A business fact is not automatically a weakness. For example,
+"serves 500 people" or "works in 17 languages" must never be turned into
+"high volume of repetitive queries/manual work" unless the research explicitly
+supports that conclusion. Prefer a concrete website/product gap instead.
 
 7.SIMPLICITY
 

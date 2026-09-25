@@ -206,6 +206,76 @@ def init_outreach_db():
 
 
 # ---------------------------------------------------------
+# LIVE OUTREACH PERSISTENCE
+# ---------------------------------------------------------
+
+def get_or_create_campaign(name="AutomateLabs live outreach"):
+    """Return the active live campaign, creating it when needed."""
+    init_outreach_db()
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM outreach_campaigns WHERE name = ? AND status = 'active' ORDER BY id DESC LIMIT 1",
+            (name,),
+        ).fetchone()
+        if row:
+            return row["id"]
+        cur = conn.execute(
+            "INSERT INTO outreach_campaigns (name, status) VALUES (?, 'active')",
+            (name,),
+        )
+        return cur.lastrowid
+
+
+def record_successful_send(*, opp_id, campaign_id, subject, html, provider_message_id):
+    """
+    Persist a Brevo-accepted live send atomically.
+
+    The contact row makes selector.py exclude this opportunity from future
+    outreach runs. The message and event preserve the provider ID for audit.
+    """
+    init_outreach_db()
+    with get_connection() as conn:
+        existing = conn.execute(
+            "SELECT id FROM outreach_contacts WHERE opp_id = ? AND campaign_id = ?",
+            (opp_id, campaign_id),
+        ).fetchone()
+        if existing:
+            raise RuntimeError(
+                f"Opportunity {opp_id} is already registered in campaign {campaign_id}; refusing to record/send it twice."
+            )
+
+        contact_cur = conn.execute(
+            """
+            INSERT INTO outreach_contacts
+                (opp_id, campaign_id, status, current_step, last_sent_at, updated_at)
+            VALUES (?, ?, 'active', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (opp_id, campaign_id),
+        )
+        contact_id = contact_cur.lastrowid
+
+        message_cur = conn.execute(
+            """
+            INSERT INTO outreach_messages
+                (contact_id, sequence_step, subject, body, provider,
+                 provider_message_id, status, sent_at)
+            VALUES (?, 1, ?, ?, 'brevo', ?, 'sent', CURRENT_TIMESTAMP)
+            """,
+            (contact_id, subject, html, str(provider_message_id)),
+        )
+        message_id = message_cur.lastrowid
+
+        conn.execute(
+            """
+            INSERT INTO outreach_events (contact_id, message_id, event_type, data)
+            VALUES (?, ?, 'sent', ?)
+            """,
+            (contact_id, message_id, f"Brevo accepted message {provider_message_id}"),
+        )
+
+    return contact_id, message_id
+
+# ---------------------------------------------------------
 # HEALTH CHECK
 # ---------------------------------------------------------
 
